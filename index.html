@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Synth Matrix - Live Preview</title>
+    <title>Synth Matrix</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -189,12 +189,13 @@
                 0 0 30px #0097A7;
         }
         
-        /* 4x3 TV Monitor Grid */
+        /* 4x3 TV Monitor Grid - Nam June Paik inspired */
         .synth-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 1.5rem;
+            gap: 3rem;
             margin-bottom: 4rem;
+            padding: 1rem;
         }
         
         .synth-monitor {
@@ -205,11 +206,12 @@
             align-items: center;
             justify-content: center;
             padding: 1rem;
-            background: #000000;
-            border-width: 4px;
+            background: #0a0a0a;
+            border-width: 8px;
             border-style: solid;
             cursor: pointer;
             transition: transform 0.3s;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
         }
         
         .synth-monitor:hover {
@@ -1825,7 +1827,8 @@ Respond ONLY with valid JSON (no markdown, no backticks):
                                 className="synth-monitor"
                                 style={{
                                     borderColor: synth.color,
-                                    boxShadow: `0 0 20px ${synth.color}, inset 0 0 30px ${synth.color}20`,
+                                    opacity: 0.8,
+                                    boxShadow: `0 0 12px ${synth.color}cc, inset 0 0 20px ${synth.color}15, 0 8px 24px rgba(0, 0, 0, 0.6)`,
                                 }}
                             >
                                 <div className="synth-monitor-scanlines"></div>
@@ -1834,7 +1837,8 @@ Respond ONLY with valid JSON (no markdown, no backticks):
                                     className="channel-number"
                                     style={{
                                         color: synth.color,
-                                        textShadow: `0 0 5px ${synth.color}`
+                                        opacity: 0.6,
+                                        textShadow: `0 0 4px ${synth.color}99`
                                     }}
                                 >
                                     CH {idx + 1}
@@ -1842,11 +1846,12 @@ Respond ONLY with valid JSON (no markdown, no backticks):
 
                                 <div className="synth-name" style={{
                                     color: synth.color,
-                                    textShadow: `0 0 10px ${synth.color}`
+                                    opacity: 0.85,
+                                    textShadow: `0 0 8px ${synth.color}99`
                                 }}>
                                     {synth.name}
                                 </div>
-                                <div className="synth-year" style={{ color: synth.color }}>
+                                <div className="synth-year" style={{ color: synth.color, opacity: 0.7 }}>
                                     {synth.year}
                                 </div>
 
