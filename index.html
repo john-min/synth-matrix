@@ -193,7 +193,8 @@
         .synth-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 3rem;
+            gap: 3rem 3rem;
+            row-gap: 3.6rem;
             margin-bottom: 4rem;
             padding: 1rem;
         }
@@ -1864,7 +1865,7 @@ Respond ONLY with valid JSON (no markdown, no backticks):
                                             color: synth.color,
                                             textShadow: `0 0 10px ${synth.color}`
                                         }}>
-                                            {synth.name}
+                                            {synth.name} ({synth.year})
                                         </div>
                                         <div style={{ color: 'rgba(255,255,255,0.9)' }}>
                                             {synth.impact}
