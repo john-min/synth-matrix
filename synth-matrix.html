@@ -1,0 +1,1994 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Synth Matrix - Live Preview</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #000000;
+            color: white;
+        }
+        
+        /* Brian Eno: Slow fade-in animation */
+        @keyframes fade-in {
+            from { 
+                opacity: 0; 
+                transform: translateY(20px);
+            }
+            to { 
+                opacity: 1; 
+                transform: translateY(0);
+            }
+        }
+        
+        .animate-fade-in {
+            animation: fade-in 2s ease-out;
+        }
+        
+        /* CRT scanlines */
+        .scanlines {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 50;
+            opacity: 0.1;
+            background-image: repeating-linear-gradient(
+                0deg, 
+                rgba(0,255,255,0.03) 0px, 
+                transparent 2px, 
+                transparent 4px
+            );
+        }
+        
+        /* Chromatic aberration cursor */
+        .cursor-glow {
+            position: fixed;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #00FFFF;
+            opacity: 0.3;
+            pointer-events: none;
+            z-index: 40;
+            filter: blur(10px);
+            transition: left 0.1s, top 0.1s;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 3rem 1.5rem;
+        }
+        
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 4rem;
+            position: relative;
+        }
+        
+        /* Tron-style title with bold streaking lines */
+        .title {
+            font-size: 5rem;
+            font-weight: 900;
+            font-family: Impact, sans-serif;
+            color: #00E5FF;
+            letter-spacing: -0.02em;
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            position: relative;
+            background: linear-gradient(
+                90deg,
+                #003A4D 0%,
+                #006B85 15%,
+                #00A5D5 35%,
+                #00E5FF 50%,
+                #00A5D5 65%,
+                #006B85 85%,
+                #003A4D 100%
+            );
+            background-size: 200% 100%;
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: wave-roll 2.5s ease-in-out infinite;
+            filter: drop-shadow(0 0 15px rgba(0, 229, 255, 0.6));
+        }
+        
+        @keyframes wave-roll {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        /* Bold Tron grid with depth */
+        .title::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 140%;
+            height: 250%;
+            background-image: 
+                linear-gradient(0deg, transparent 24%, rgba(0, 229, 255, 0.2) 25%, rgba(0, 229, 255, 0.2) 26%, transparent 27%, transparent 74%, rgba(0, 229, 255, 0.2) 75%, rgba(0, 229, 255, 0.2) 76%, transparent 77%, transparent),
+                linear-gradient(90deg, transparent 24%, rgba(0, 229, 255, 0.2) 25%, rgba(0, 229, 255, 0.2) 26%, transparent 27%, transparent 74%, rgba(0, 229, 255, 0.2) 75%, rgba(0, 229, 255, 0.2) 76%, transparent 77%, transparent);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: -1;
+            opacity: 0.5;
+            animation: grid-pulse 4s ease-in-out infinite;
+        }
+        
+        @keyframes grid-pulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.6; }
+        }
+        
+        /* Horizontal streaking lines - Tron light cycles */
+        .title::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 200%;
+            height: 100%;
+            background: linear-gradient(
+                90deg,
+                transparent 0%,
+                transparent 40%,
+                rgba(0, 229, 255, 0.0) 45%,
+                rgba(0, 229, 255, 0.4) 48%,
+                rgba(0, 229, 255, 0.8) 50%,
+                rgba(0, 229, 255, 0.4) 52%,
+                rgba(0, 229, 255, 0.0) 55%,
+                transparent 60%,
+                transparent 100%
+            );
+            pointer-events: none;
+            z-index: 2;
+            animation: light-streak 3s linear infinite;
+        }
+        
+        @keyframes light-streak {
+            0% { 
+                left: -100%;
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            100% { 
+                left: 100%;
+                opacity: 0;
+            }
+        }
+        
+        .subtitle {
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            color: #00E5FF;
+            text-shadow: 
+                0 0 10px #00E5FF,
+                0 0 20px #00E5FF,
+                0 0 30px #0097A7;
+        }
+        
+        /* 4x3 TV Monitor Grid */
+        .synth-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 4rem;
+        }
+        
+        .synth-monitor {
+            position: relative;
+            aspect-ratio: 4/3;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            background: #000000;
+            border-width: 4px;
+            border-style: solid;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+        
+        .synth-monitor:hover {
+            transform: scale(1.05);
+            z-index: 20;
+        }
+        
+        .synth-monitor-scanlines {
+            position: absolute;
+            inset: 0;
+            opacity: 0.2;
+            pointer-events: none;
+            background-image: repeating-linear-gradient(
+                0deg, 
+                transparent 0px, 
+                rgba(255,255,255,0.03) 2px, 
+                transparent 4px
+            );
+        }
+        
+        .channel-number {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            font-size: 0.75rem;
+            font-family: monospace;
+            font-weight: bold;
+            opacity: 0.6;
+        }
+        
+        .synth-name {
+            font-size: 1rem;
+            font-family: Impact, sans-serif;
+            margin-bottom: 0.5rem;
+            line-height: 1.2;
+            text-align: center;
+            position: relative;
+            z-index: 10;
+            font-weight: 900;
+        }
+        
+        .synth-year {
+            font-size: 0.875rem;
+            font-family: monospace;
+            opacity: 0.8;
+            position: relative;
+            z-index: 10;
+            font-weight: 600;
+        }
+        
+        .tooltip {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 100%;
+            margin-bottom: 0.5rem;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 30;
+            transition: opacity 0.3s;
+        }
+        
+        .synth-monitor:hover .tooltip {
+            opacity: 1;
+        }
+        
+        .tooltip-content {
+            background: #000000;
+            border: 2px solid;
+            padding: 0.75rem;
+            font-size: 0.75rem;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .tooltip-title {
+            font-weight: bold;
+            margin-bottom: 0.25rem;
+        }
+        
+        /* Muted Neon Electronic Terminal */
+        .input-section {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0;
+            background: #0a0a0a;
+            border: 2px solid rgba(0, 229, 255, 0.4);
+            box-shadow: 
+                0 0 20px rgba(0, 229, 255, 0.2),
+                inset 0 0 40px rgba(0, 229, 255, 0.03);
+            position: relative;
+        }
+        
+        /* Subtle vertical accent bar */
+        .terminal-blue-bar {
+            position: absolute;
+            left: 0;
+            top: 50px;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(to bottom, rgba(255, 0, 170, 0.5) 0%, rgba(0, 229, 255, 0.5) 100%);
+            box-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
+        }
+        
+        .terminal-header {
+            background: rgba(0, 229, 255, 0.08);
+            padding: 0.75rem 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(0, 229, 255, 0.3);
+        }
+        
+        .terminal-title {
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            font-weight: bold;
+            color: rgba(0, 229, 255, 0.8);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            text-shadow: 0 0 8px rgba(0, 229, 255, 0.4);
+        }
+        
+        .terminal-dots {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .terminal-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: rgba(0, 229, 255, 0.2);
+            border: 1px solid rgba(0, 229, 255, 0.4);
+        }
+        
+        .terminal-body {
+            padding: 2rem;
+            padding-left: 2.5rem;
+            background: #000000;
+            position: relative;
+        }
+        
+        .terminal-scanlines {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0.08;
+            background-image: repeating-linear-gradient(
+                0deg,
+                transparent 0px,
+                rgba(0, 229, 255, 0.15) 1px,
+                transparent 2px
+            );
+        }
+        
+        .terminal-prompt {
+            font-family: 'Courier New', monospace;
+            font-size: 1rem;
+            color: rgba(0, 229, 255, 0.5);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-shadow: 0 0 5px rgba(0, 229, 255, 0.3);
+        }
+        
+        .prompt-symbol {
+            display: none;
+        }
+        
+        .input-label {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            display: block;
+            margin-bottom: 0.75rem;
+            color: rgba(255, 0, 170, 0.6);
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            text-shadow: 0 0 8px rgba(255, 0, 170, 0.3);
+        }
+        
+        .input-textarea {
+            width: 100%;
+            padding: 1rem 0;
+            padding-left: 1rem;
+            background: transparent;
+            border: none;
+            border-left: 2px solid rgba(0, 229, 255, 0.4);
+            font-size: 1.5rem;
+            font-weight: 400;
+            font-family: 'Courier New', monospace;
+            color: rgba(255, 255, 255, 0.9);
+            outline: none;
+            resize: none;
+            line-height: 1.6;
+            caret-color: rgba(255, 0, 170, 0.8);
+            text-shadow: 0 0 8px rgba(255, 255, 255, 0.2);
+        }
+        
+        .input-textarea::placeholder {
+            color: rgba(255, 255, 255, 0.2);
+        }
+        
+        .input-count {
+            display: none;
+        }
+        
+        .button {
+            width: 100%;
+            margin-top: 2rem;
+            padding: 1.25rem;
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.3em;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, rgba(255, 0, 170, 0.15) 0%, rgba(0, 229, 255, 0.15) 100%);
+            color: rgba(0, 229, 255, 0.9);
+            border: 1px solid rgba(0, 229, 255, 0.4);
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 
+                0 0 15px rgba(0, 229, 255, 0.2),
+                inset 0 0 20px rgba(0, 229, 255, 0.05);
+            text-shadow: 0 0 10px rgba(0, 229, 255, 0.5);
+        }
+        
+        .button:hover:not(:disabled) {
+            background: linear-gradient(135deg, rgba(255, 0, 170, 0.25) 0%, rgba(0, 229, 255, 0.25) 100%);
+            border-color: rgba(0, 229, 255, 0.6);
+            box-shadow: 
+                0 0 25px rgba(0, 229, 255, 0.3),
+                inset 0 0 30px rgba(0, 229, 255, 0.1);
+            transform: translateY(-2px);
+        }
+        
+        .button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        
+        /* Results - Barragan + Eno Golden Hour with Layered Information */
+        .results-container {
+            min-height: 100vh;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        /* Eno 3: Animated gradient loops */
+        .gradient-loop {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0.3;
+        }
+        
+        @keyframes drift-1 {
+            0%, 100% { transform: translateX(-20%); }
+            50% { transform: translateX(20%); }
+        }
+        
+        @keyframes drift-2 {
+            0%, 100% { transform: translateX(20%); }
+            50% { transform: translateX(-20%); }
+        }
+        
+        @keyframes drift-3 {
+            0%, 100% { transform: translateY(-10%); }
+            50% { transform: translateY(10%); }
+        }
+        
+        .loop-1 { animation: drift-1 17s ease-in-out infinite; }
+        .loop-2 { animation: drift-2 13s ease-in-out infinite; }
+        .loop-3 { animation: drift-3 11s ease-in-out infinite; }
+        
+        .water-reflection {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 33%;
+            background: rgba(200, 155, 139, 0.3);
+            backdrop-filter: blur(2px);
+        }
+        
+        .water-surface {
+            position: absolute;
+            bottom: 33%;
+            left: 0;
+            right: 0;
+            height: 0.5px;
+            background: rgba(90, 58, 49, 0.2);
+        }
+        
+        .results-content {
+            position: relative;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 5rem 2rem;
+            min-height: 100vh;
+        }
+        
+        .results-inner {
+            width: 100%;
+        }
+        
+        .results-header {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+        
+        /* Eno 3: Loop indicators showing system layers */
+        .loop-indicators {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .loop-bar {
+            height: 4px;
+            background: rgba(200, 155, 139, 0.6);
+            transition: all 1s;
+        }
+        
+        @keyframes spin-loop {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .spinning-loop {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(200, 155, 139, 0.4);
+            border-top-color: rgba(200, 155, 139, 0.8);
+            border-radius: 50%;
+            display: inline-block;
+            margin: 0 0.25rem;
+        }
+        
+        .loop-1-icon { animation: spin-loop 7s linear infinite; }
+        .loop-2-icon { animation: spin-loop 11s linear infinite; }
+        .loop-3-icon { animation: spin-loop 13s linear infinite; }
+        .loop-4-icon { animation: spin-loop 17s linear infinite; }
+        
+        .results-subtitle {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            margin-bottom: 1.5rem;
+            color: #8B6B61;
+        }
+        
+        .results-title {
+            font-size: 6rem;
+            font-weight: 300;
+            margin-bottom: 1.5rem;
+            color: #5A3A31;
+            font-family: Georgia, serif;
+            letter-spacing: -0.05em;
+            line-height: 1;
+        }
+        
+        .results-year {
+            font-size: 1rem;
+            font-weight: 300;
+            color: #8B6B61;
+            margin-bottom: 3rem;
+        }
+        
+        /* Eno 3: Layered information boxes */
+        .info-layers {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2rem;
+            margin-bottom: 4rem;
+        }
+        
+        .info-layer {
+            padding: 2rem;
+            background: rgba(245, 241, 232, 0.85);
+            position: relative;
+        }
+        
+        .info-layer::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: rgba(200, 155, 139, 0.4);
+        }
+        
+        .layer-label {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            margin-bottom: 0.75rem;
+            opacity: 0.5;
+            color: #8B6B61;
+        }
+        
+        .layer-value {
+            font-size: 2.5rem;
+            font-weight: 300;
+            color: #5A3A31;
+            font-family: Georgia, serif;
+        }
+        
+        .layer-unit {
+            font-size: 1rem;
+            opacity: 0.6;
+        }
+        
+        .content-box {
+            max-width: 900px;
+            margin: 0 auto;
+            position: relative;
+            margin-bottom: 4rem;
+        }
+        
+        .content-card {
+            padding: 3rem;
+            background: rgba(245, 241, 232, 0.95);
+            box-shadow: 0 30px 60px rgba(90, 58, 49, 0.15);
+            position: relative;
+        }
+        
+        .border-accent-1 {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: #C89B8B;
+            opacity: 0.3;
+        }
+        
+        .border-accent-2 {
+            position: absolute;
+            top: 1px;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: #D4A5A5;
+            opacity: 0.2;
+        }
+        
+        .reasoning {
+            font-size: 1.25rem;
+            line-height: 1.8;
+            font-weight: 300;
+            margin-bottom: 2rem;
+            color: #5A3A31;
+            font-family: Georgia, serif;
+        }
+        
+        .sonic-profile {
+            font-size: 1rem;
+            font-style: italic;
+            font-weight: 300;
+            color: #8B6B61;
+            margin-bottom: 2rem;
+        }
+        
+        .history-section {
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid rgba(139, 107, 97, 0.2);
+        }
+        
+        .section-title {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+            color: #8B6B61;
+        }
+        
+        .history-text {
+            font-size: 1rem;
+            line-height: 1.7;
+            font-weight: 300;
+            color: #5A3A31;
+            margin-bottom: 1.5rem;
+        }
+        
+        .tracks-list {
+            list-style: none;
+        }
+        
+        .track-item {
+            font-size: 0.95rem;
+            line-height: 1.8;
+            font-weight: 300;
+            color: #5A3A31;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+        
+        .track-item::before {
+            content: '—';
+            position: absolute;
+            left: 0;
+            opacity: 0.4;
+        }
+        
+        .reflection {
+            margin-top: 0.5rem;
+            padding: 3rem;
+            opacity: 0.15;
+            background: rgba(245, 241, 232, 0.5);
+            transform: scaleY(-1);
+            filter: blur(3px);
+        }
+        
+        .results-buttons {
+            text-align: center;
+            margin-top: 4rem;
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+        }
+        
+        .btn-primary {
+            padding: 1rem 2.5rem;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.25em;
+            background: linear-gradient(135deg, #FFD4A8 0%, #F2998F 100%);
+            color: #5A3A31;
+            border: none;
+            cursor: pointer;
+            transition: box-shadow 0.3s;
+        }
+        
+        .btn-primary:hover {
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .btn-secondary {
+            padding: 1rem 2.5rem;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            color: #8B6B61;
+            opacity: 0.5;
+            background: transparent;
+            border: 1px solid rgba(139, 107, 97, 0.3);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-secondary:hover {
+            opacity: 1;
+            border-color: rgba(139, 107, 97, 0.5);
+        }
+        
+        @media (max-width: 768px) {
+            .synth-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .title {
+                font-size: 3rem;
+            }
+            
+            .results-title {
+                font-size: 4rem;
+            }
+            
+            .input-textarea {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="scanlines"></div>
+    <div class="cursor-glow" id="cursorGlow"></div>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        // API Key Management
+        const getApiKey = () => {
+            return localStorage.getItem('anthropic_api_key') || '';
+        };
+        
+        const setApiKeyStorage = (key) => {
+            localStorage.setItem('anthropic_api_key', key);
+        };
+        
+        const SynthMatrix = () => {
+            const [artists, setArtists] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [result, setResult] = useState(null);
+            const [profileStage, setProfileStage] = useState(null); // New: for showing AI-suggested profile
+            const [userProfile, setUserProfile] = useState(null); // New: stores the profile characteristics
+            const [glitchOffset, setGlitchOffset] = useState(0);
+            const [apiKey, setApiKeyState] = useState(getApiKey());
+
+            const saveApiKey = (key) => {
+                setApiKeyStorage(key);
+                setApiKeyState(key);
+            };
+
+            const SYNTH_LIBRARY = [
+                { 
+                    name: 'MOOG MINIMOOG', 
+                    color: '#00FFFF', 
+                    year: '1970', 
+                    impact: 'Set template for all analog synths',
+                    palette: {
+                        bg1: '#2C4A6B', // Deep navy blue
+                        bg2: '#3D5A7C', 
+                        bg3: '#4E6B8D',
+                        water: 'rgba(60, 90, 124, 0.3)',
+                        surface: 'rgba(44, 74, 107, 0.2)',
+                        text: '#1A2F4A',
+                        accent: '#5B7BA0',
+                        card: 'rgba(225, 230, 240, 0.95)'
+                    }
+                },
+                { 
+                    name: 'ROLAND TB-303', 
+                    color: '#00FF00', 
+                    year: '1982', 
+                    impact: 'Created acid house genre',
+                    palette: {
+                        bg1: '#3D5E3D', // Acid lime/forest green
+                        bg2: '#4D6E4D',
+                        bg3: '#5D7E5D',
+                        water: 'rgba(77, 110, 77, 0.3)',
+                        surface: 'rgba(61, 94, 61, 0.2)',
+                        text: '#2A4A2A',
+                        accent: '#6B9B6B',
+                        card: 'rgba(230, 240, 230, 0.95)'
+                    }
+                },
+                { 
+                    name: 'YAMAHA DX7', 
+                    color: '#FFFF00', 
+                    year: '1983', 
+                    impact: 'Best-seller, defined 80s sound',
+                    palette: {
+                        bg1: '#8B7355', // Warm beige/tan (80s corporate)
+                        bg2: '#9B8365',
+                        bg3: '#AB9375',
+                        water: 'rgba(155, 131, 101, 0.3)',
+                        surface: 'rgba(139, 115, 85, 0.2)',
+                        text: '#5A4A35',
+                        accent: '#C8A882',
+                        card: 'rgba(245, 240, 235, 0.95)'
+                    }
+                },
+                { 
+                    name: 'PROPHET-5', 
+                    color: '#FF00FF', 
+                    year: '1978', 
+                    impact: 'First programmable polysynth',
+                    palette: {
+                        bg1: '#8B5A7C', // Deep mauve/plum
+                        bg2: '#9B6A8C',
+                        bg3: '#AB7A9C',
+                        water: 'rgba(155, 106, 140, 0.3)',
+                        surface: 'rgba(139, 90, 124, 0.2)',
+                        text: '#5A3A4C',
+                        accent: '#C89BB5',
+                        card: 'rgba(242, 235, 240, 0.95)'
+                    }
+                },
+                { 
+                    name: 'ROLAND TR-808', 
+                    color: '#FF0000', 
+                    year: '1980', 
+                    impact: 'Foundation of hip-hop/trap',
+                    palette: {
+                        bg1: '#A85446', // Terracotta/brick red
+                        bg2: '#B86456',
+                        bg3: '#C87466',
+                        water: 'rgba(184, 100, 86, 0.3)',
+                        surface: 'rgba(168, 84, 70, 0.2)',
+                        text: '#6A3428',
+                        accent: '#D89080',
+                        card: 'rgba(245, 235, 230, 0.95)'
+                    }
+                },
+                { 
+                    name: 'ROLAND TR-909', 
+                    color: '#FF00AA', 
+                    year: '1983', 
+                    impact: 'Blueprint for house/techno',
+                    palette: {
+                        bg1: '#9B5B7A', // Rose/dusty pink
+                        bg2: '#AB6B8A',
+                        bg3: '#BB7B9A',
+                        water: 'rgba(171, 107, 138, 0.3)',
+                        surface: 'rgba(155, 91, 122, 0.2)',
+                        text: '#5C3A4A',
+                        accent: '#D49BB8',
+                        card: 'rgba(245, 235, 242, 0.95)'
+                    }
+                },
+                { 
+                    name: 'FAIRLIGHT CMI', 
+                    color: '#00AAFF', 
+                    year: '1979', 
+                    impact: 'Introduced sampling',
+                    palette: {
+                        bg1: '#5B7B9B', // Steel blue
+                        bg2: '#6B8BAB',
+                        bg3: '#7B9BBB',
+                        water: 'rgba(107, 139, 171, 0.3)',
+                        surface: 'rgba(91, 123, 155, 0.2)',
+                        text: '#3A4A5C',
+                        accent: '#9BB8D4',
+                        card: 'rgba(235, 240, 245, 0.95)'
+                    }
+                },
+                { 
+                    name: 'ARP 2600', 
+                    color: '#AA00FF', 
+                    year: '1971', 
+                    impact: 'Semi-modular innovation',
+                    palette: {
+                        bg1: '#6B4A7C', // Deep violet
+                        bg2: '#7B5A8C',
+                        bg3: '#8B6A9C',
+                        water: 'rgba(123, 90, 140, 0.3)',
+                        surface: 'rgba(107, 74, 124, 0.2)',
+                        text: '#4A3058',
+                        accent: '#A888B8',
+                        card: 'rgba(240, 235, 245, 0.95)'
+                    }
+                },
+                { 
+                    name: 'OBERHEIM OB-XA', 
+                    color: '#FF5500', 
+                    year: '1980', 
+                    impact: 'Analog polyphonic standard',
+                    palette: {
+                        bg1: '#A86446', // Burnt orange
+                        bg2: '#B87456',
+                        bg3: '#C88466',
+                        water: 'rgba(184, 116, 86, 0.3)',
+                        surface: 'rgba(168, 100, 70, 0.2)',
+                        text: '#6A4028',
+                        accent: '#D89B7A',
+                        card: 'rgba(245, 238, 230, 0.95)'
+                    }
+                },
+                { 
+                    name: 'YAMAHA CS-80', 
+                    color: '#FFAA00', 
+                    year: '1977', 
+                    impact: 'Cinematic synthesizer king',
+                    palette: {
+                        bg1: '#9B7A46', // Warm amber/honey
+                        bg2: '#AB8A56',
+                        bg3: '#BB9A66',
+                        water: 'rgba(171, 138, 86, 0.3)',
+                        surface: 'rgba(155, 122, 70, 0.2)',
+                        text: '#5C4A28',
+                        accent: '#D4B888',
+                        card: 'rgba(245, 242, 235, 0.95)'
+                    }
+                },
+                { 
+                    name: 'ROLAND JUNO-106', 
+                    color: '#0055FF', 
+                    year: '1984', 
+                    impact: 'Democratized polysynth',
+                    palette: {
+                        bg1: '#FFD6A5', // Warm coral/peach (friendly)
+                        bg2: '#FFB696',
+                        bg3: '#F2998F',
+                        water: 'rgba(200, 155, 139, 0.3)',
+                        surface: 'rgba(90, 58, 49, 0.2)',
+                        text: '#5A3A31',
+                        accent: '#C89B8B',
+                        card: 'rgba(245, 241, 232, 0.95)'
+                    }
+                },
+                { 
+                    name: 'KORG M1', 
+                    color: '#00FF88', 
+                    year: '1988', 
+                    impact: 'Workstation revolution',
+                    palette: {
+                        bg1: '#5B8B6B', // Sage green
+                        bg2: '#6B9B7B',
+                        bg3: '#7BAB8B',
+                        water: 'rgba(107, 155, 123, 0.3)',
+                        surface: 'rgba(91, 139, 107, 0.2)',
+                        text: '#3A5A45',
+                        accent: '#9BC8AB',
+                        card: 'rgba(238, 245, 240, 0.95)'
+                    }
+                },
+            ];
+
+            // Glitch effect
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    setGlitchOffset(Math.random() > 0.9 ? Math.random() * 4 - 2 : 0);
+                }, 100);
+                return () => clearInterval(interval);
+            }, []);
+
+            // Cursor tracking
+            useEffect(() => {
+                const cursorGlow = document.getElementById('cursorGlow');
+                const handleMouseMove = (e) => {
+                    cursorGlow.style.left = (e.clientX - 10) + 'px';
+                    cursorGlow.style.top = (e.clientY - 10) + 'px';
+                };
+                window.addEventListener('mousemove', handleMouseMove);
+                return () => window.removeEventListener('mousemove', handleMouseMove);
+            }, []);
+
+            const analyzeMusicTaste = async () => {
+                console.log('Button clicked! Starting analyzeMusicTaste...');
+                
+                if (!artists.trim()) return;
+                
+                if (!apiKey.trim()) {
+                    alert('Please enter your Anthropic API key');
+                    return;
+                }
+                
+                if (!apiKey.startsWith('sk-ant-')) {
+                    alert('Invalid API key format. Key should start with "sk-ant-"');
+                    return;
+                }
+                
+                console.log('Starting analysis for artists:', artists);
+                setLoading(true);
+                
+                try {
+                    // STAGE 1: AI generates user's taste profile with characteristic weights
+                    console.log('Fetching profile from API...');
+                    console.log('API Key (first 20 chars):', apiKey.substring(0, 20) + '...');
+                    console.log('Artists:', artists);
+                    
+                    const profileResponse = await fetch("/api/messages", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            apiKey: apiKey,
+                            model: "claude-sonnet-4-20250514",
+                            max_tokens: 1500,
+                            messages: [{
+                                role: "user",
+                                content: `You are a music analysis expert. Analyze these artists and create a taste profile.
+
+Artists: ${artists}
+
+Create a profile scoring these characteristics (0-100 scale):
+- sonicCharacter: How much they value specific sonic textures and timbres
+- productionStyle: Their approach to production (experimental vs polished)
+- timbreMatch: Preference for specific instrument timbres
+- eraAlignment: Connection to specific musical eras
+- genreOverlap: Genre consistency vs eclecticism
+
+Also provide brief explanations for each score.
+
+Respond ONLY with valid JSON (no markdown, no backticks):
+{
+  "profile": {
+    "sonicCharacter": 85,
+    "productionStyle": 70,
+    "timbreMatch": 90,
+    "eraAlignment": 75,
+    "genreOverlap": 80
+  },
+  "explanations": {
+    "sonicCharacter": "Brief explanation of their sonic preferences",
+    "productionStyle": "Brief explanation of their production style",
+    "timbreMatch": "Brief explanation of timbre preferences",
+    "eraAlignment": "Brief explanation of era connections",
+    "genreOverlap": "Brief explanation of genre consistency"
+  },
+  "summary": "2-3 sentence overall taste summary"
+}`
+                            }]
+                        })
+                    });
+
+                    console.log('✓ Fetch completed!');
+                    console.log('Response object:', profileResponse);
+                    console.log('Response status:', profileResponse.status);
+                    console.log('Response headers:', [...profileResponse.headers.entries()]);
+
+                    const profileData = await profileResponse.json();
+                    console.log('Profile response status:', profileResponse.status);
+                    console.log('Profile response ok:', profileResponse.ok);
+                    console.log('Profile response:', profileData);
+                    
+                    if (!profileResponse.ok) {
+                        throw new Error(`API Error: ${profileResponse.status} - ${JSON.stringify(profileData)}`);
+                    }
+                    
+                    const profileText = profileData.content[0].text;
+                    const cleanedProfileText = profileText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+                    const profileResult = JSON.parse(cleanedProfileText);
+                    
+                    console.log('Profile generated:', profileResult);
+                    
+                    // Store profile and show it to user
+                    setUserProfile(profileResult);
+                    setProfileStage('review');
+                    setLoading(false);
+                    
+                } catch (error) {
+                    console.error('Profile generation error:', error);
+                    console.error('Error name:', error.name);
+                    console.error('Error message:', error.message);
+                    console.error('Error stack:', error.stack);
+                    
+                    let errorMessage = 'Error generating profile: ' + error.message;
+                    
+                    // Check for CORS error
+                    if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+                        errorMessage = 'Network Error: Unable to reach Anthropic API.\n\n' +
+                                     'This might be a CORS issue when running from a local file.\n\n' +
+                                     'Try serving this HTML via a web server:\n' +
+                                     'python3 -m http.server 8000\n' +
+                                     'Then open: http://localhost:8000/synth-matrix-clean-preview.html';
+                    }
+                    
+                    // Check for API key error
+                    if (error.message.includes('401') || error.message.includes('authentication')) {
+                        errorMessage = 'Authentication Error: Invalid API key.\n\n' +
+                                     'Please check that your API key is correct.\n' +
+                                     'Get a new key at: https://console.anthropic.com/';
+                    }
+                    
+                    alert(errorMessage);
+                    setLoading(false);
+                }
+            };
+
+            const findMatch = async (finalProfile) => {
+                setLoading(true);
+                
+                try {
+                    // STAGE 2: Use the profile to match with synth
+                    const matchResponse = await fetch("/api/messages", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            apiKey: apiKey,
+                            model: "claude-sonnet-4-20250514",
+                            max_tokens: 2000,
+                            messages: [{
+                                role: "user",
+                                content: `You are a synthesizer matching expert.
+
+Given this user taste profile:
+${JSON.stringify(finalProfile.profile, null, 2)}
+
+Original artists: ${artists}
+
+Choose the BEST MATCH from these 12 legendary synthesizers:
+1. MOOG MINIMOOG (1970) - Warm analog bass/lead, progressive rock
+2. ROLAND TB-303 (1982) - Acid house, squelchy resonant bass
+3. YAMAHA DX7 (1983) - FM synthesis, crystalline bells, 80s pop
+4. PROPHET-5 (1978) - Warm polyphonic analog, programmable
+5. ROLAND TR-808 (1980) - Hip-hop drums, booming bass kick
+6. ROLAND TR-909 (1983) - House/techno drums, punchy percussion
+7. FAIRLIGHT CMI (1979) - Early sampling, orchestral textures
+8. ARP 2600 (1971) - Semi-modular, experimental synthesis
+9. OBERHEIM OB-XA (1980) - Lush analog strings, 80s soundtracks
+10. YAMAHA CS-80 (1977) - Cinematic pads, Blade Runner sound
+11. ROLAND JUNO-106 (1984) - Chorus-heavy pads, accessible warmth
+12. KORG M1 (1988) - Workstation presets, 90s dance music
+
+Use the profile scores to guide your decision. Higher scores mean more important factors.
+
+Respond ONLY with valid JSON (no markdown, no backticks):
+{
+  "synthesizer": "exact name from list above",
+  "confidence": 85-98,
+  "reasoning": "2-3 sentence explanation of the match",
+  "sonicProfile": "One phrase describing the sonic aesthetic",
+  "matchSummary": {
+    "sonicMatch": "Detailed paragraph explaining WHY these specific artists align with this synth's sonic character",
+    "artistTracks": [
+      "Specific example connecting artist 1 to this synth with real albums/tracks if possible",
+      "Specific example connecting artist 2 to this synth with production techniques",
+      "Specific example connecting artist 3 to this synth with timbral qualities"
+    ]
+  },
+  "scorecard": {
+    "sonicCharacter": 0-100,
+    "productionStyle": 0-100,
+    "timbreMatch": 0-100,
+    "eraAlignment": 0-100,
+    "genreOverlap": 0-100
+  }
+}`
+                            }]
+                        })
+                    });
+
+                    const matchData = await matchResponse.json();
+                    const matchText = matchData.content[0].text;
+                    const cleanedMatchText = matchText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+                    const aiResult = JSON.parse(cleanedMatchText);
+                    
+                    // Find the selected synth from library
+                    const selectedSynth = SYNTH_LIBRARY.find(s => s.name === aiResult.synthesizer);
+                    
+                    if (!selectedSynth) {
+                        throw new Error('Synth not found in library');
+                    }
+                    
+                    // Get history and iconic tracks
+                    const histories = {
+                        'MOOG MINIMOOG': 'Released in 1970, the Minimoog became the archetype for all analog synthesizers. Bob Moog\'s portable design brought modular synthesis to stages worldwide, defining the sound of progressive rock and electronic music.',
+                        'ROLAND TB-303': 'Designed in 1982 as a bass accompaniment for guitarists, the TB-303 was initially a commercial failure. Rediscovered by Chicago house producers in the late 80s, its squelchy acid sound became the foundation of acid house and techno.',
+                        'YAMAHA DX7': 'The DX7\'s FM synthesis revolutionized music production in 1983. Its digital precision and iconic electric piano sound made it the best-selling hardware synthesizer in history, defining the sound of 80s pop and R&B.',
+                        'PROPHET-5': 'Sequential Circuits\' Prophet-5 (1978) was the first fully programmable polyphonic synthesizer. Its warm analog sound and patch memory made it indispensable for touring musicians and studio producers.',
+                        'ROLAND TR-808': 'Released in 1980, the TR-808\'s distinctive booming bass drum was initially criticized as unrealistic. Hip-hop producers embraced its character, making it the rhythmic foundation of modern urban music.',
+                        'ROLAND TR-909': 'The TR-909 (1983) bridged analog and digital percussion. Its punchy kick and crisp hi-hats became the blueprint for house, techno, and electronic dance music worldwide.',
+                        'FAIRLIGHT CMI': 'The Fairlight CMI (1979) brought sampling to mainstream music production. At $30,000, it was a studio luxury, but its influence on 80s pop was immeasurable.',
+                        'ARP 2600': 'ARP\'s semi-modular 2600 (1971) offered unprecedented flexibility. Its pre-patched signal path made it accessible to beginners while maintaining modular depth for experts.',
+                        'OBERHEIM OB-XA': 'The OB-Xa (1980) represented the pinnacle of analog polyphony. Its rich, warm sound became synonymous with 80s soundtracks and synth-pop.',
+                        'YAMAHA CS-80': 'Vangelis\' weapon of choice, the CS-80 (1977) was a polyphonic powerhouse. Its expressive ribbon controller and lush pads defined cinematic synthesizer music.',
+                        'ROLAND JUNO-106': 'Released in 1984, the Juno-106 democratized polyphonic synthesis. Its built-in chorus effect and affordability made lush pad sounds accessible to bedroom producers worldwide.',
+                        'KORG M1': 'The M1 workstation (1988) sold over 250,000 units. Its piano and string presets defined the sound of 90s house, trance, and dance music.'
+                    };
+                    
+                    const iconicTracksData = {
+                        'MOOG MINIMOOG': ['Kraftwerk — Autobahn', 'Rick Wakeman — Journey to the Centre of the Earth', 'Parliament — Flash Light', 'Gary Numan — Cars'],
+                        'ROLAND TB-303': ['Phuture — Acid Tracks', 'Josh Wink — Higher State of Consciousness', 'Plastikman — Spastik', 'Hardfloor — Acperience'],
+                        'YAMAHA DX7': ['Whitney Houston — I Wanna Dance With Somebody', 'A-ha — Take On Me', 'Phil Collins — Sussudio', 'Toto — Africa'],
+                        'PROPHET-5': ['Michael Jackson — Thriller', 'Daft Punk — Giorgio by Moroder', 'Dr. Dre — The Next Episode', 'Boards of Canada — Roygbiv'],
+                        'ROLAND TR-808': ['Marvin Gaye — Sexual Healing', 'Afrika Bambaataa — Planet Rock', 'Kanye West — Love Lockdown', 'OutKast — Ms. Jackson'],
+                        'ROLAND TR-909': ['Inner City — Good Life', 'Frankie Knuckles — Your Love', 'Jeff Mills — The Bells', 'Daft Punk — Around the World'],
+                        'FAIRLIGHT CMI': ['Kate Bush — Running Up That Hill', 'Peter Gabriel — Sledgehammer', 'Herbie Hancock — Rockit', 'Art of Noise — Close (To the Edit)'],
+                        'ARP 2600': ['The Who — Won\'t Get Fooled Again', 'Herbie Hancock — Chameleon', 'Edgar Winter — Frankenstein', 'Stevie Wonder — Contusion'],
+                        'OBERHEIM OB-XA': ['Van Halen — Jump', 'Prince — 1999', 'Styx — Mr. Roboto', 'Queen — Radio Ga Ga'],
+                        'YAMAHA CS-80': ['Vangelis — Blade Runner Theme', 'Toto — Africa', 'Ultravox — Vienna', 'Jean-Michel Jarre — Oxygène'],
+                        'ROLAND JUNO-106': ['Enya — Orinoco Flow', 'Vince Clarke — Just Can\'t Get Enough', '808 State — Pacific State', 'The Orb — Little Fluffy Clouds'],
+                        'KORG M1': ['Madonna — Vogue', 'Snap! — The Power', 'Robert Miles — Children', '2 Unlimited — No Limit']
+                    };
+                    
+                    setResult({
+                        synthesizer: selectedSynth.name,
+                        year: selectedSynth.year,
+                        confidence: aiResult.confidence,
+                        reasoning: aiResult.reasoning,
+                        sonicProfile: aiResult.sonicProfile,
+                        history: histories[selectedSynth.name],
+                        iconicTracks: iconicTracksData[selectedSynth.name],
+                        matchSummary: aiResult.matchSummary,
+                        scorecard: aiResult.scorecard,
+                        palette: selectedSynth.palette,
+                        userProfile: finalProfile // Store the profile used
+                    });
+                    
+                    setProfileStage(null);
+                    
+                } catch (error) {
+                    console.error('Matching error:', error);
+                    alert('Error finding match: ' + error.message);
+                    // Fallback to random
+                    const randomSynth = SYNTH_LIBRARY[Math.floor(Math.random() * SYNTH_LIBRARY.length)];
+                    setResult({
+                        synthesizer: randomSynth.name,
+                        year: randomSynth.year,
+                        confidence: 85,
+                        reasoning: `Your taste suggests affinity with the ${randomSynth.name}'s sonic character.`,
+                        sonicProfile: 'Timeless character with modern relevance',
+                        matchSummary: {
+                            sonicMatch: 'Your musical preferences align with this synthesizer\'s distinctive sonic qualities.',
+                            artistTracks: [
+                                'Your preferred artists often work with similar synthesis techniques',
+                                'The timbral characteristics match your aesthetic preferences',
+                                'This synth appears in productions similar to your taste'
+                            ]
+                        },
+                        scorecard: {
+                            sonicCharacter: 85,
+                            productionStyle: 80,
+                            timbreMatch: 88,
+                            eraAlignment: 75,
+                            genreOverlap: 82
+                        },
+                        palette: randomSynth.palette
+                    });
+                    setProfileStage(null);
+                }
+                
+                setLoading(false);
+            };
+
+            // Main component render
+            console.log('Render state:', { result: !!result, profileStage, hasUserProfile: !!userProfile, loading });
+            
+            if (result) {
+                const p = result.palette; // Shorthand for palette
+                
+                return (
+                    <div className="results-container animate-fade-in" style={{
+                        background: `linear-gradient(to bottom, ${p.bg1} 0%, ${p.bg2} 50%, ${p.bg3} 100%)`
+                    }}>
+                        {/* Eno 3: Animated gradient loops */}
+                        <div className="gradient-loop loop-1" style={{
+                            background: `linear-gradient(90deg, transparent 0%, ${p.water} 50%, transparent 100%)`
+                        }}></div>
+                        <div className="gradient-loop loop-2" style={{
+                            background: `linear-gradient(90deg, transparent 0%, ${p.water.replace('0.3', '0.25')} 50%, transparent 100%)`
+                        }}></div>
+                        <div className="gradient-loop loop-3" style={{
+                            background: `linear-gradient(0deg, transparent 0%, ${p.water.replace('0.3', '0.2')} 50%, transparent 100%)`
+                        }}></div>
+
+                        <div className="water-reflection" style={{ background: p.water }}></div>
+                        <div className="water-surface" style={{ background: p.surface }}></div>
+
+                        <div className="results-content">
+                            <div className="results-inner">
+                                <div className="results-header">
+                                    {/* Eno 3: Spinning loop indicators */}
+                                    <div className="loop-indicators">
+                                        <span className="spinning-loop loop-1-icon" style={{ borderColor: p.water, borderTopColor: p.accent }}></span>
+                                        <span className="spinning-loop loop-2-icon" style={{ borderColor: p.water, borderTopColor: p.accent }}></span>
+                                        <span className="spinning-loop loop-3-icon" style={{ borderColor: p.water, borderTopColor: p.accent }}></span>
+                                        <span className="spinning-loop loop-4-icon" style={{ borderColor: p.water, borderTopColor: p.accent }}></span>
+                                    </div>
+
+                                    <div className="results-subtitle" style={{ color: p.text }}>
+                                        Your Instrument
+                                    </div>
+
+                                    <h2 className="results-title" style={{ color: p.text }}>
+                                        {result.synthesizer}
+                                    </h2>
+
+                                    <div className="results-year" style={{ color: p.text, opacity: 0.6 }}>
+                                        {result.year}
+                                    </div>
+                                </div>
+
+                                {/* Eno 3: Layered information - three stacked bars */}
+                                <div className="info-layers">
+                                    <div className="info-layer" style={{ background: p.card }}>
+                                        <div className="layer-label" style={{ color: p.text }}>Match Rate</div>
+                                        <div className="layer-value" style={{ color: p.text }}>
+                                            {result.confidence}<span className="layer-unit">%</span>
+                                        </div>
+                                    </div>
+                                    <div className="info-layer" style={{ background: p.card }}>
+                                        <div className="layer-label" style={{ color: p.text }}>Era</div>
+                                        <div className="layer-value" style={{ color: p.text }}>
+                                            {result.year}
+                                        </div>
+                                    </div>
+                                    <div className="info-layer" style={{ background: p.card }}>
+                                        <div className="layer-label" style={{ color: p.text }}>Type</div>
+                                        <div className="layer-value" style={{ fontSize: '1.5rem', color: p.text }}>
+                                            Polysynth
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Probabilistic Reasoning Scorecard */}
+                                {result.scorecard && (
+                                    <div style={{ 
+                                        maxWidth: '900px', 
+                                        margin: '0 auto 4rem',
+                                        padding: '2rem',
+                                        background: p.card,
+                                        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)'
+                                    }}>
+                                        <div style={{
+                                            fontSize: '0.65rem',
+                                            textTransform: 'uppercase',
+                                            letterSpacing: '0.15em',
+                                            marginBottom: '1.5rem',
+                                            opacity: 0.5,
+                                            color: p.text,
+                                            textAlign: 'center'
+                                        }}>
+                                            Match Analysis Breakdown
+                                        </div>
+
+                                        <div style={{ display: 'grid', gap: '1rem' }}>
+                                            {Object.entries(result.scorecard).map(([key, value]) => {
+                                                const labels = {
+                                                    sonicCharacter: 'Sonic Character',
+                                                    productionStyle: 'Production Style',
+                                                    timbreMatch: 'Timbre Match',
+                                                    eraAlignment: 'Era Alignment',
+                                                    genreOverlap: 'Genre Overlap'
+                                                };
+                                                
+                                                return (
+                                                    <div key={key}>
+                                                        <div style={{
+                                                            display: 'flex',
+                                                            justifyContent: 'space-between',
+                                                            marginBottom: '0.5rem'
+                                                        }}>
+                                                            <span style={{
+                                                                fontSize: '0.875rem',
+                                                                color: p.text,
+                                                                fontWeight: 300
+                                                            }}>
+                                                                {labels[key]}
+                                                            </span>
+                                                            <span style={{
+                                                                fontSize: '0.875rem',
+                                                                color: p.accent,
+                                                                fontWeight: 600
+                                                            }}>
+                                                                {value}%
+                                                            </span>
+                                                        </div>
+                                                        <div style={{
+                                                            width: '100%',
+                                                            height: '8px',
+                                                            background: `${p.text}15`,
+                                                            position: 'relative',
+                                                            overflow: 'hidden'
+                                                        }}>
+                                                            <div style={{
+                                                                width: `${value}%`,
+                                                                height: '100%',
+                                                                background: `linear-gradient(90deg, ${p.accent} 0%, ${p.bg3} 100%)`,
+                                                                transition: 'width 1s ease-out'
+                                                            }} />
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="content-box">
+                                    <div className="content-card" style={{ background: p.card }}>
+                                        <div className="border-accent-1" style={{ background: p.accent }}></div>
+                                        <div className="border-accent-2" style={{ background: p.accent, opacity: 0.5 }}></div>
+
+                                        <p className="reasoning" style={{ color: p.text }}>
+                                            {result.reasoning}
+                                        </p>
+
+                                        <p className="sonic-profile" style={{ color: p.text, opacity: 0.7 }}>
+                                            "{result.sonicProfile}"
+                                        </p>
+
+                                        {/* Match Summary - Artist-to-Synth Analysis */}
+                                        {result.matchSummary && (
+                                            <div className="history-section">
+                                                <div className="section-title" style={{ color: p.text }}>Match Summary</div>
+                                                
+                                                <div style={{ marginBottom: '1.5rem' }}>
+                                                    <div className="section-subtitle" style={{ 
+                                                        fontSize: '0.75rem',
+                                                        textTransform: 'uppercase',
+                                                        letterSpacing: '0.1em',
+                                                        marginBottom: '0.75rem',
+                                                        opacity: 0.6,
+                                                        color: p.text
+                                                    }}>
+                                                        Sonic Connection
+                                                    </div>
+                                                    <p className="history-text" style={{ color: p.text, marginBottom: 0 }}>
+                                                        {result.matchSummary.sonicMatch}
+                                                    </p>
+                                                </div>
+                                                
+                                                <div>
+                                                    <div className="section-subtitle" style={{ 
+                                                        fontSize: '0.75rem',
+                                                        textTransform: 'uppercase',
+                                                        letterSpacing: '0.1em',
+                                                        marginBottom: '0.75rem',
+                                                        opacity: 0.6,
+                                                        color: p.text
+                                                    }}>
+                                                        Your Artists & This Synth
+                                                    </div>
+                                                    <ul className="tracks-list">
+                                                        {result.matchSummary.artistTracks.map((track, idx) => (
+                                                            <li key={idx} className="track-item" style={{ 
+                                                                color: p.text,
+                                                                fontSize: '0.95rem',
+                                                                lineHeight: '1.7'
+                                                            }}>
+                                                                {track}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* History section */}
+                                        {result.history && (
+                                            <div className="history-section">
+                                                <div className="section-title" style={{ color: p.text }}>History</div>
+                                                <p className="history-text" style={{ color: p.text }}>
+                                                    {result.history}
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {/* Iconic tracks section */}
+                                        {result.iconicTracks && result.iconicTracks.length > 0 && (
+                                            <div className="history-section" style={{ borderTopColor: `${p.text}33` }}>
+                                                <div className="section-title" style={{ color: p.text }}>Iconic Tracks</div>
+                                                <ul className="tracks-list">
+                                                    {result.iconicTracks.map((track, idx) => (
+                                                        <li key={idx} className="track-item" style={{ color: p.text }}>
+                                                            {track}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="reflection" style={{ background: p.card, opacity: 0.15 }}></div>
+                                </div>
+
+                                <div className="results-buttons">
+                                    <button 
+                                        className="btn-primary"
+                                        style={{
+                                            background: `linear-gradient(135deg, ${p.accent} 0%, ${p.bg3} 100%)`,
+                                            color: p.text
+                                        }}
+                                        onClick={() => alert('37-key MIDI synthesizer would open here with computer keyboard mapping (Z-M, Q-I, 2-7 for sharps)')}
+                                    >
+                                        Play Synth
+                                    </button>
+
+                                    <button 
+                                        className="btn-primary"
+                                        style={{
+                                            background: `linear-gradient(135deg, ${p.accent} 0%, ${p.bg3} 100%)`,
+                                            color: p.text
+                                        }}
+                                        onClick={() => alert('Random riff generator would create a melodic pattern using this synth\'s characteristics')}
+                                    >
+                                        Generate Riff
+                                    </button>
+
+                                    <button 
+                                        className="btn-secondary"
+                                        style={{
+                                            color: p.text,
+                                            borderColor: `${p.text}4D`
+                                        }}
+                                        onClick={() => setResult(null)}
+                                    >
+                                        Return
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // Profile review stage OR main input/matrix view
+            return (
+                <div className="container">
+                    {/* Loading Overlay */}
+                    {loading && (
+                        <div style={{
+                            position: 'fixed',
+                            inset: 0,
+                            background: 'rgba(0, 0, 0, 0.9)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 1000
+                        }}>
+                            <div style={{
+                                fontFamily: 'Courier New, monospace',
+                                fontSize: '1.5rem',
+                                color: 'rgba(0, 229, 255, 0.9)',
+                                textAlign: 'center'
+                            }}>
+                                ▸ PROCESSING...
+                                <div style={{
+                                    marginTop: '1rem',
+                                    fontSize: '0.875rem',
+                                    color: 'rgba(255, 255, 255, 0.5)'
+                                }}>
+                                    Analyzing your music taste
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Profile Review Stage - Optional Slider Adjustment */}
+                    {profileStage === 'review' && userProfile && (
+                        <div style={{
+                            minHeight: '100vh',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '2rem'
+                        }}>
+                            <div style={{
+                                maxWidth: '900px',
+                                width: '100%',
+                                background: 'rgba(10, 10, 10, 0.95)',
+                                border: '2px solid rgba(0, 229, 255, 0.4)',
+                                padding: '3rem',
+                                boxShadow: '0 0 40px rgba(0, 229, 255, 0.2)'
+                            }}>
+                                <h2 style={{
+                                    fontFamily: 'Impact, sans-serif',
+                                    fontSize: '2rem',
+                                    color: 'rgba(0, 229, 255, 0.9)',
+                                    textAlign: 'center',
+                                    marginBottom: '1rem',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.1em'
+                                }}>
+                                    Your Taste Profile
+                                </h2>
+                                
+                                <p style={{
+                                    fontFamily: 'Georgia, serif',
+                                    fontSize: '1rem',
+                                    color: 'rgba(255, 255, 255, 0.7)',
+                                    textAlign: 'center',
+                                    marginBottom: '2rem',
+                                    lineHeight: '1.6'
+                                }}>
+                                    {userProfile.summary}
+                                </p>
+
+                                <div style={{
+                                    marginBottom: '2rem',
+                                    padding: '2rem',
+                                    background: 'rgba(0, 229, 255, 0.05)',
+                                    borderLeft: '3px solid rgba(0, 229, 255, 0.4)'
+                                }}>
+                                    {Object.entries(userProfile.profile).map(([key, value]) => {
+                                        const labels = {
+                                            sonicCharacter: 'Sonic Character',
+                                            productionStyle: 'Production Style',
+                                            timbreMatch: 'Timbre Match',
+                                            eraAlignment: 'Era Alignment',
+                                            genreOverlap: 'Genre Overlap'
+                                        };
+                                        
+                                        return (
+                                            <div key={key} style={{ marginBottom: '1.5rem' }}>
+                                                <div style={{
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    marginBottom: '0.5rem',
+                                                    alignItems: 'baseline'
+                                                }}>
+                                                    <span style={{
+                                                        fontFamily: 'Courier New, monospace',
+                                                        fontSize: '0.875rem',
+                                                        color: 'rgba(0, 229, 255, 0.8)',
+                                                        textTransform: 'uppercase',
+                                                        letterSpacing: '0.1em'
+                                                    }}>
+                                                        {labels[key]}
+                                                    </span>
+                                                    <span style={{
+                                                        fontFamily: 'Courier New, monospace',
+                                                        fontSize: '1.25rem',
+                                                        color: 'rgba(0, 229, 255, 1)',
+                                                        fontWeight: 'bold'
+                                                    }}>
+                                                        {value}%
+                                                    </span>
+                                                </div>
+                                                <div style={{
+                                                    width: '100%',
+                                                    height: '6px',
+                                                    background: 'rgba(0, 229, 255, 0.1)',
+                                                    position: 'relative',
+                                                    overflow: 'hidden'
+                                                }}>
+                                                    <div style={{
+                                                        width: `${value}%`,
+                                                        height: '100%',
+                                                        background: 'linear-gradient(90deg, rgba(0, 229, 255, 0.6) 0%, rgba(0, 229, 255, 1) 100%)',
+                                                        boxShadow: '0 0 10px rgba(0, 229, 255, 0.5)'
+                                                    }} />
+                                                </div>
+                                                <p style={{
+                                                    fontFamily: 'Georgia, serif',
+                                                    fontSize: '0.875rem',
+                                                    color: 'rgba(255, 255, 255, 0.6)',
+                                                    marginTop: '0.5rem',
+                                                    fontStyle: 'italic'
+                                                }}>
+                                                    {userProfile.explanations[key]}
+                                                </p>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                <div style={{
+                                    display: 'flex',
+                                    gap: '1rem',
+                                    justifyContent: 'center'
+                                }}>
+                                    <button
+                                        onClick={() => findMatch(userProfile)}
+                                        style={{
+                                            padding: '1rem 3rem',
+                                            fontFamily: 'Courier New, monospace',
+                                            fontSize: '1rem',
+                                            textTransform: 'uppercase',
+                                            letterSpacing: '0.2em',
+                                            fontWeight: 'bold',
+                                            background: 'linear-gradient(135deg, rgba(255, 0, 170, 0.2) 0%, rgba(0, 229, 255, 0.2) 100%)',
+                                            color: 'rgba(0, 229, 255, 0.9)',
+                                            border: '2px solid rgba(0, 229, 255, 0.6)',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.3s',
+                                            boxShadow: '0 0 20px rgba(0, 229, 255, 0.3)'
+                                        }}
+                                        onMouseOver={(e) => {
+                                            e.target.style.background = 'linear-gradient(135deg, rgba(255, 0, 170, 0.3) 0%, rgba(0, 229, 255, 0.3) 100%)';
+                                            e.target.style.boxShadow = '0 0 30px rgba(0, 229, 255, 0.5)';
+                                        }}
+                                        onMouseOut={(e) => {
+                                            e.target.style.background = 'linear-gradient(135deg, rgba(255, 0, 170, 0.2) 0%, rgba(0, 229, 255, 0.2) 100%)';
+                                            e.target.style.boxShadow = '0 0 20px rgba(0, 229, 255, 0.3)';
+                                        }}
+                                    >
+                                        {loading ? '▸ Matching...' : '▸ Find My Synth'}
+                                    </button>
+                                    
+                                    <button
+                                        onClick={() => {
+                                            setProfileStage(null);
+                                            setUserProfile(null);
+                                        }}
+                                        style={{
+                                            padding: '1rem 2rem',
+                                            fontFamily: 'Courier New, monospace',
+                                            fontSize: '0.875rem',
+                                            textTransform: 'uppercase',
+                                            letterSpacing: '0.15em',
+                                            background: 'transparent',
+                                            color: 'rgba(255, 255, 255, 0.5)',
+                                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.3s'
+                                        }}
+                                        onMouseOver={(e) => {
+                                            e.target.style.color = 'rgba(255, 255, 255, 0.8)';
+                                            e.target.style.borderColor = 'rgba(255, 255, 255, 0.4)';
+                                        }}
+                                        onMouseOut={(e) => {
+                                            e.target.style.color = 'rgba(255, 255, 255, 0.5)';
+                                            e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                                        }}
+                                    >
+                                        ← Start Over
+                                    </button>
+                                </div>
+
+                                <p style={{
+                                    marginTop: '2rem',
+                                    textAlign: 'center',
+                                    fontFamily: 'Courier New, monospace',
+                                    fontSize: '0.75rem',
+                                    color: 'rgba(255, 255, 255, 0.4)',
+                                    fontStyle: 'italic'
+                                }}>
+                                    Note: Slider adjustment feature coming soon
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {!profileStage && !result && (
+                        <div className="header">
+                            <h1 className="title">
+                                SYNTH MATRIX
+                            </h1>
+                        </div>
+                    )}
+
+                    {!profileStage && !result && (
+                        <div className="synth-grid">
+                        {SYNTH_LIBRARY.map((synth, idx) => (
+                            <div
+                                key={idx}
+                                className="synth-monitor"
+                                style={{
+                                    borderColor: synth.color,
+                                    boxShadow: `0 0 20px ${synth.color}, inset 0 0 30px ${synth.color}20`,
+                                }}
+                            >
+                                <div className="synth-monitor-scanlines"></div>
+
+                                <div 
+                                    className="channel-number"
+                                    style={{
+                                        color: synth.color,
+                                        textShadow: `0 0 5px ${synth.color}`
+                                    }}
+                                >
+                                    CH {idx + 1}
+                                </div>
+
+                                <div className="synth-name" style={{
+                                    color: synth.color,
+                                    textShadow: `0 0 10px ${synth.color}`
+                                }}>
+                                    {synth.name}
+                                </div>
+                                <div className="synth-year" style={{ color: synth.color }}>
+                                    {synth.year}
+                                </div>
+
+                                <div className="tooltip">
+                                    <div className="tooltip-content" style={{
+                                        borderColor: synth.color,
+                                        boxShadow: `0 0 30px ${synth.color}`
+                                    }}>
+                                        <div className="tooltip-title" style={{
+                                            color: synth.color,
+                                            textShadow: `0 0 10px ${synth.color}`
+                                        }}>
+                                            {synth.name}
+                                        </div>
+                                        <div style={{ color: 'rgba(255,255,255,0.9)' }}>
+                                            {synth.impact}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                        </div>
+                    )}
+
+                    {!profileStage && !result && (
+                    <div className="input-section">
+                        <div className="terminal-header">
+                            <div className="terminal-title">
+                                ▸ SYNTH_MATCHER_v2.1
+                            </div>
+                            <div className="terminal-dots">
+                                <div className="terminal-dot"></div>
+                                <div className="terminal-dot"></div>
+                                <div className="terminal-dot"></div>
+                            </div>
+                        </div>
+                        
+                        {/* Casa Gilardi blue accent */}
+                        <div className="terminal-blue-bar"></div>
+                        
+                        <div className="terminal-body">
+                            <div className="terminal-scanlines"></div>
+                            
+                            <div className="terminal-prompt">
+                                <span>root@synthmatrix:~$</span>
+                            </div>
+                            
+                            <label>
+                                <span className="input-label">
+                                    &gt; INPUT_ARTISTS
+                                </span>
+                                <textarea
+                                    className="input-textarea"
+                                    value={artists}
+                                    onChange={(e) => setArtists(e.target.value)}
+                                    placeholder="Brian Eno, Boards of Canada, Four Tet..."
+                                    rows="3"
+                                />
+                            </label>
+
+                            {/* API Key Input */}
+                            <label style={{
+                                display: 'block',
+                                marginBottom: '1.5rem'
+                            }}>
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    marginBottom: '0.5rem'
+                                }}>
+                                    <span className="input-label">
+                                        &gt; API_KEY
+                                    </span>
+                                    {apiKey && (
+                                        <span style={{
+                                            fontFamily: 'Courier New, monospace',
+                                            fontSize: '0.7rem',
+                                            color: 'rgba(0, 255, 170, 0.6)',
+                                            letterSpacing: '0.05em'
+                                        }}>
+                                            ✓ SAVED
+                                        </span>
+                                    )}
+                                </div>
+                                <input
+                                    type="password"
+                                    className="input-textarea"
+                                    value={apiKey}
+                                    onChange={(e) => {
+                                        const key = e.target.value;
+                                        setApiKeyState(key);
+                                        if (key.trim()) {
+                                            saveApiKey(key);
+                                        }
+                                    }}
+                                    placeholder="sk-ant-api03-..."
+                                    style={{
+                                        fontFamily: 'Courier New, monospace',
+                                        fontSize: '0.85rem',
+                                        padding: '0.75rem',
+                                        letterSpacing: '0.05em'
+                                    }}
+                                />
+                                <div style={{
+                                    marginTop: '0.5rem',
+                                    fontFamily: 'Courier New, monospace',
+                                    fontSize: '0.7rem',
+                                    color: 'rgba(255, 255, 255, 0.4)',
+                                    lineHeight: '1.4'
+                                }}>
+                                    Get your key at{' '}
+                                    <a 
+                                        href="https://console.anthropic.com/" 
+                                        target="_blank"
+                                        style={{
+                                            color: 'rgba(0, 229, 255, 0.7)',
+                                            textDecoration: 'none',
+                                            borderBottom: '1px solid rgba(0, 229, 255, 0.3)'
+                                        }}
+                                    >
+                                        console.anthropic.com
+                                    </a>
+                                    {' • Stored locally in browser'}
+                                </div>
+                            </label>
+
+                            <button
+                                className="button"
+                                onClick={analyzeMusicTaste}
+                                disabled={loading || !artists.trim() || !apiKey.trim()}
+                            >
+                                {loading ? '▸ PROCESSING...' : '▸ EXECUTE'}
+                            </button>
+                        </div>
+                    </div>
+                    )}
+                </div>
+            );
+        };
+
+        ReactDOM.render(<SynthMatrix />, document.getElementById('root'));
+    </script>
+</body>
+</html>
