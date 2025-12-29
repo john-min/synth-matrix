@@ -6,18 +6,18 @@
       "use": "@vercel/node"
     },
     {
-      "src": "synth-matrix-clean-preview.html",
+      "src": "index.html",
       "use": "@vercel/static"
     }
   ],
   "routes": [
     {
-      "src": "/",
-      "dest": "/synth-matrix-clean-preview.html"
-    },
-    {
       "src": "/api/messages",
       "dest": "/api/messages.js"
+    },
+    {
+      "src": "/",
+      "dest": "/index.html"
     }
   ]
 }
