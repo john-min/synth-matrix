@@ -7,22 +7,12 @@ const path = require('path');
 const PORT = 8000;
 
 const server = http.createServer((req, res) => {
-  // Serve HTML file
-  if (req.url === '/' || req.url === '/index.html') {
-    fs.readFile(path.join(__dirname, 'index.html'), (err, data) => {
-      if (err) {
-        res.writeHead(500);
-        res.end('Error loading HTML file');
-        return;
-      }
-      res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(data);
-    });
-    return;
-  }
-
+  console.log(`\n=== Incoming Request ===`);
+  console.log(`${req.method} ${req.url}`);
+  
   // Proxy API requests
   if (req.url === '/api/messages' && req.method === 'POST') {
+    console.log('Handling API proxy request');
     let body = '';
     
     req.on('data', chunk => {
@@ -32,7 +22,7 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
       const requestData = JSON.parse(body);
       const apiKey = requestData.apiKey;
-      delete requestData.apiKey; // Remove API key from body
+      delete requestData.apiKey;
       
       const options = {
         hostname: 'api.anthropic.com',
@@ -75,12 +65,55 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // 404
-  res.writeHead(404);
-  res.end('Not found');
+  // Serve static files
+  let filePath = path.join(__dirname, req.url === '/' ? 'index.html' : req.url);
+  
+  console.log(`Attempting to serve: ${filePath}`);
+  console.log(`File exists: ${fs.existsSync(filePath)}`);
+  
+  // Get file extension to set proper content type
+  const ext = path.extname(filePath).toLowerCase();
+  const contentTypes = {
+    '.html': 'text/html',
+    '.css': 'text/css',
+    '.js': 'application/javascript',
+    '.jsx': 'application/javascript',
+    '.json': 'application/json',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.svg': 'image/svg+xml'
+  };
+  
+  const contentType = contentTypes[ext] || 'application/octet-stream';
+  console.log(`Content-Type: ${contentType}`);
+  
+  fs.readFile(filePath, (err, data) => {
+    if (err) {
+      if (err.code === 'ENOENT') {
+        console.error(`❌ File not found: ${filePath}`);
+        res.writeHead(404);
+        res.end('404 - File not found');
+      } else {
+        console.error(`❌ Error reading file: ${err}`);
+        res.writeHead(500);
+        res.end('500 - Internal server error');
+      }
+      return;
+    }
+    
+    console.log(`✅ Successfully served ${filePath} (${data.length} bytes)`);
+    res.writeHead(200, { 'Content-Type': contentType });
+    res.end(data);
+  });
 });
 
 server.listen(PORT, () => {
+  console.log(`\n🎹 Synth Matrix Server`);
+  console.log(`================================`);
   console.log(`Server running at http://localhost:${PORT}/`);
   console.log(`Open http://localhost:${PORT}/ in your browser`);
+  console.log(`================================\n`);
 });
