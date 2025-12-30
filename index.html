@@ -205,6 +205,11 @@
             aspect-ratio: 4/3;
             perspective: 1000px;
             cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        
+        .synth-monitor:hover {
+            transform: translateY(-4px);
         }
         
         .flip-card-inner {
@@ -853,6 +858,53 @@
                 setApiKeyState(key);
             };
 
+            // New: Function to show synth details directly
+            const showSynthDetails = (synth) => {
+                const histories = {
+                    'MOOG MINIMOOG': 'Released in 1970, the Minimoog became the archetype for all analog synthesizers. Bob Moog\'s portable design brought modular synthesis to stages worldwide, defining the sound of progressive rock and electronic music.',
+                    'ROLAND TB-303': 'Designed in 1982 as a bass accompaniment for guitarists, the TB-303 was initially a commercial failure. Rediscovered by Chicago house producers in the late 80s, its squelchy acid sound became the foundation of acid house and techno.',
+                    'YAMAHA DX7': 'The DX7\'s FM synthesis revolutionized music production in 1983. Its digital precision and iconic electric piano sound made it the best-selling hardware synthesizer in history, defining the sound of 80s pop and R&B.',
+                    'PROPHET-5': 'Sequential Circuits\' Prophet-5 (1978) was the first fully programmable polyphonic synthesizer. Its warm analog sound and patch memory made it indispensable for touring musicians and studio producers.',
+                    'ROLAND TR-808': 'Released in 1980, the TR-808\'s distinctive booming bass drum was initially criticized as unrealistic. Hip-hop producers embraced its character, making it the rhythmic foundation of modern urban music.',
+                    'ROLAND TR-909': 'The TR-909 (1983) bridged analog and digital percussion. Its punchy kick and crisp hi-hats became the blueprint for house, techno, and electronic dance music worldwide.',
+                    'FAIRLIGHT CMI': 'The Fairlight CMI (1979) brought sampling to mainstream music production. At $30,000, it was a studio luxury, but its influence on 80s pop was immeasurable.',
+                    'ARP 2600': 'ARP\'s semi-modular 2600 (1971) offered unprecedented flexibility. Its pre-patched signal path made it accessible to beginners while maintaining modular depth for experts.',
+                    'OBERHEIM OB-XA': 'The OB-Xa (1980) represented the pinnacle of analog polyphony. Its rich, warm sound became synonymous with 80s soundtracks and synth-pop.',
+                    'YAMAHA CS-80': 'Vangelis\' weapon of choice, the CS-80 (1977) was a polyphonic powerhouse. Its expressive ribbon controller and lush pads defined cinematic synthesizer music.',
+                    'ROLAND JUNO-106': 'Released in 1984, the Juno-106 democratized polyphonic synthesis. Its built-in chorus effect and affordability made lush pad sounds accessible to bedroom producers worldwide.',
+                    'KORG M1': 'The M1 workstation (1988) sold over 250,000 units. Its piano and string presets defined the sound of 90s house, trance, and dance music.'
+                };
+                
+                const iconicTracksData = {
+                    'MOOG MINIMOOG': ['Kraftwerk — Autobahn', 'Rick Wakeman — Journey to the Centre of the Earth', 'Parliament — Flash Light', 'Gary Numan — Cars'],
+                    'ROLAND TB-303': ['Phuture — Acid Tracks', 'Josh Wink — Higher State of Consciousness', 'Plastikman — Spastik', 'Hardfloor — Acperience'],
+                    'YAMAHA DX7': ['Whitney Houston — I Wanna Dance With Somebody', 'A-ha — Take On Me', 'Phil Collins — Sussudio', 'Toto — Africa'],
+                    'PROPHET-5': ['Michael Jackson — Thriller', 'Daft Punk — Giorgio by Moroder', 'Dr. Dre — The Next Episode', 'Boards of Canada — Roygbiv'],
+                    'ROLAND TR-808': ['Marvin Gaye — Sexual Healing', 'Afrika Bambaataa — Planet Rock', 'Kanye West — Love Lockdown', 'OutKast — Ms. Jackson'],
+                    'ROLAND TR-909': ['Inner City — Good Life', 'Frankie Knuckles — Your Love', 'Jeff Mills — The Bells', 'Daft Punk — Around the World'],
+                    'FAIRLIGHT CMI': ['Kate Bush — Running Up That Hill', 'Peter Gabriel — Sledgehammer', 'Herbie Hancock — Rockit', 'Art of Noise — Close (To the Edit)'],
+                    'ARP 2600': ['The Who — Won\'t Get Fooled Again', 'Herbie Hancock — Chameleon', 'Edgar Winter — Frankenstein', 'Stevie Wonder — Contusion'],
+                    'OBERHEIM OB-XA': ['Van Halen — Jump', 'Prince — 1999', 'Styx — Mr. Roboto', 'Queen — Radio Ga Ga'],
+                    'YAMAHA CS-80': ['Vangelis — Blade Runner Theme', 'Toto — Africa', 'Ultravox — Vienna', 'Jean-Michel Jarre — Oxygène'],
+                    'ROLAND JUNO-106': ['Enya — Orinoco Flow', 'Vince Clarke — Just Can\'t Get Enough', '808 State — Pacific State', 'The Orb — Little Fluffy Clouds'],
+                    'KORG M1': ['Madonna — Vogue', 'Snap! — The Power', 'Robert Miles — Children', '2 Unlimited — No Limit']
+                };
+
+                setResult({
+                    synthesizer: synth.name,
+                    year: synth.year,
+                    confidence: null, // No AI matching
+                    reasoning: synth.impact,
+                    sonicProfile: 'Classic synthesizer',
+                    history: histories[synth.name],
+                    iconicTracks: iconicTracksData[synth.name],
+                    matchSummary: null, // No AI matching summary
+                    scorecard: null, // No AI scorecard
+                    palette: synth.palette,
+                    userProfile: null
+                });
+            };
+
             const SYNTH_LIBRARY = [
                 { 
                     name: 'MOOG MINIMOOG', 
@@ -1411,12 +1463,14 @@ Respond ONLY with valid JSON (no markdown, no backticks):
 
                                 {/* Eno 3: Layered information - three stacked bars */}
                                 <div className="info-layers">
-                                    <div className="info-layer" style={{ background: p.card }}>
-                                        <div className="layer-label" style={{ color: p.text }}>Match Rate</div>
-                                        <div className="layer-value" style={{ color: p.text }}>
-                                            {result.confidence}<span className="layer-unit">%</span>
+                                    {result.confidence !== null && (
+                                        <div className="info-layer" style={{ background: p.card }}>
+                                            <div className="layer-label" style={{ color: p.text }}>Match Rate</div>
+                                            <div className="layer-value" style={{ color: p.text }}>
+                                                {result.confidence}<span className="layer-unit">%</span>
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
                                     <div className="info-layer" style={{ background: p.card }}>
                                         <div className="layer-label" style={{ color: p.text }}>Era</div>
                                         <div className="layer-value" style={{ color: p.text }}>
@@ -1862,7 +1916,12 @@ Respond ONLY with valid JSON (no markdown, no backticks):
                     {!profileStage && !result && (
                         <div className="synth-grid">
                             {SYNTH_LIBRARY.map((synth, idx) => (
-                                <div key={idx} className="synth-monitor">
+                                <div 
+                                    key={idx} 
+                                    className="synth-monitor"
+                                    onClick={() => showSynthDetails(synth)}
+                                    style={{ cursor: 'pointer' }}
+                                >
                                     <div className="flip-card-inner">
                                         {/* FRONT: INFO */}
                                         <div 
